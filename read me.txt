@@ -1,0 +1,93 @@
+Como usar o simulador?
+
+O simulador executa as seguintes funções para realizar a simulação: (em ordem)
+
+-- Transmissão
+1 - Gera bits aleatórios
+2 - Codifica os bits gerados (codificação de canal - opcional)
+3 - Mapeia os bits codificados em uma constelação
+4 - Filtra os bits mapeados com um pulso raiz quadrada de cosseno levantado
+5 - Introduz ISI controlada (opcional)
+
+-- Passagem pelo canal
+6 - Filtra o sinal pelo canal TTE
+7 - Introduz ruído aditivo
+
+-- Recepção
+8 - Filtra o sinal recebido com um filtro casado
+9 - Aplica equalização MLSE (opcional) 
+10 - Demodula o sinal
+11 - Decodifica o sinal
+12 - Calcula a taxa de erro de bit
+
+O produto do simulador é uma curva da taxa de erro de bit em função de Eb/N0 fixada (parâmetro da simulação).
+
+Há dois arquivos principais: 'Simulation_Main.m' e 'Simulation_Settings.m'. Os parâmetros da simulação são escolhidos no arquivo 'Simulation_Settings.m'.
+O arquivo 'Simulation_Main.m' é o que efetivamente executa a simulação.
+
+Uma grande variedade de parâmetros podem ser modificados no 'Simulation_Settings.m' como por exemplo, esquema de modulação, equalização, formatação de pulso, etc.
+Os parâmetros são identificados por variáveis cujos nomes deixam claro qual parâmetro representam. Por exemplo, a variável "modulationScheme" vai determinar o esquema
+de modulação. Os valores possíveis para os parâmetros são específicados nos comentários ao lado.
+
+Alguns parâmetros específicos não são determinados no 'Simulation_Settings.m', pois estão localizados em outros arquivos. Esses parâmetros são os seguintes:
+
+1 - Ordem do filtro FIR que modela o canal TTE. Este parâmetro se encontra dentro do arquivo 'TTE_FIR.m'.
+
+2 - Parâmetros referentes ao circuito das antenas transmissora e receptora (como número de voltas, largura do fio, etc) e valores dos componentes adicionais 
+(resistores de amortecimento e capacitores para ressonância). Estão nos arquivos 'VL_com_ressonancia' (usada quando se quer obervar o efeito da ressonância 
+no circuito das antenas loop) e 'VL_sem_ressonancia' (quando não se quer usar ressonância).
+
+
+Probleminhas:
+
+
+1 - É importante que o usuário verifique se a frequência de amostragem satisfaz o teorema da amostragem.
+
+Ex:
+
+if Rs < 3750
+    Fs = 3750*sampsPerSym;
+else
+    Fs = Rs * sampsPerSym;                                                   % Sampling frequency (samples/s).
+end
+
+Se a taxa de símbolos 'Rs' for pequena demais aumenta-se o valor de 'Fs' para garantir uma frequência de amostragem suficientemente alta 
+(pode ser outro valor, desde que respeite o teorema da amostragem)
+
+----------------------------------------------------------------------------------------------------------------------------
+
+2 - O canal TTE é modelado por um filtro FIR na função TTE_FIR. Conforme aumentamos R, aumentamos a taxa de amostragem Fs.
+Se Fs aumenta, a ordem do filtro deve aumentar também para que o filtro seja criado com precisão
+
+A ordem do filtro deve ser sempre múltiplo do número de amostras por símbolo (sampsPersymbol) para facilitar na criação do Whited Matched Filter (WMF)
+usado na equalização MLSE.No momento, o código está mal escrito e considera que sampsPersymbol = 8 sempre.
+
+Possível (ainda não totalmente testada) lógica para encontrar a ordem do filtro:
+Para R < 10kbps --> ordem do filtro = 80
+
+Para 10 kbps < R < 30kbps --> ordem do filtro = 160
+
+Para R> 30kbps --> ordem do filtro = 480
+
+Resumo: Não mudar o valor de sampsPersymbol. Ao aumentar a taxa de transmissão R, verificar se a ordem do filtro é adequada.
+
+----------------------------------------------------------------------------------------------------------------------------
+
+3 - Quando estiver utilizando o pulso duobinário modificado (modDuobin) há um BUG no processo de criação do Whited Matched Filter (WMF)
+
+usada na equalização. Isso ocorre pq há zeros em cima do círculo unitário
+e a função do MATLAB 'firminphase' não funciona direito e então para algumas taxas, o WMF não é gerado corretamente.
+
+Normalmente o problema é solucionado aumentando a ordem do filtro FIR que modela o canal TTE na função TTE_FIR.(Problema 2)
+
+Para alguns casos (notamente quando R = 20kbps) é preciso passar como parâmetro qntos zeros existem em cima do circulo unitário
+para a função firminphase. Para esse caso, o WMF deve ser criado pelo comando:
+
+F2_mod_duobin = firminphase(E_mod_duobin,2) (já implementado);
+
+Resumo: Se a equalização não funcionar para modDuobin, a ordem do filtro FIR que modela o canal TTE não deve ser estar boa.
+
+4 - para 1kbps a simulação modDuobin não está funcionando.
+
+-------------------------------------------------------------------------------------------------------------------------
+Reverificar o funcionamento do código para modulação PSK --> Resultados estranhos!
